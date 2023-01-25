@@ -10,6 +10,7 @@ import {
   Radio,
   Slider,
   Row,
+  notification,
 } from "antd";
 import styled from "styled-components";
 import {
@@ -18,10 +19,14 @@ import {
   SmileOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
+import { getApiUrl } from "../utils";
 
 const FormItem = Form.Item;
 
 function PositionTerminal() {
+  const [form] = Form.useForm();
+  const [api, contextHolder] = notification.useNotification();
+
   const ButtonSize = "large";
   const [symbolList, setSymbolList] = useState([]);
   const [ticker, setTicker] = useState("BTCUSDT");
@@ -34,7 +39,7 @@ function PositionTerminal() {
   useEffect(() => {
     axios({
       method: "get",
-      url: "http://localhost:8000/bybit/get-symbols",
+      url: getApiUrl("bybit/get-symbols"),
     }).then((res) => {
       if (res.status == 200 && res.data) {
         if (res.data.length) {
@@ -55,9 +60,27 @@ function PositionTerminal() {
     });
   }, []);
 
+  const onOpenPosition = (side) => {
+    const size = form.getFieldValue("amount");
+    axios({
+      method: "post",
+      url: getApiUrl("bybit/open-position"),
+      data: {
+        side,
+        symbol: ticker,
+        size,
+        leverage: leverage.value,
+      },
+    }).then((res) => {
+      if (res.status == 200 && res.data) {
+      }
+    });
+  };
+
   return (
     <Card title={"Terminal"} extra={<SettingOutlined onClick={() => {}} />}>
-      <Form layout="vertical">
+      {contextHolder}
+      <Form layout="vertical" form={form}>
         <FormItem>
           <Radio.Group defaultValue="a" buttonStyle="solid">
             <Radio.Button value="a">Bybit</Radio.Button>
@@ -111,11 +134,24 @@ function PositionTerminal() {
           </div>
         </FormItem>
         <FormItem>
-          <Space>
-            <ActionButton size={ButtonSize} shape="round" type="primary">
+          <Space style={{ textAlign: "center" }}>
+            <ActionButton
+              size={ButtonSize}
+              shape="round"
+              type="primary"
+              onClick={() => {
+                onOpenPosition("Buy");
+              }}
+            >
               Long
             </ActionButton>
-            <ActionButton size={ButtonSize} shape="round">
+            <ActionButton
+              size={ButtonSize}
+              shape="round"
+              onClick={() => {
+                onOpenPosition("Short");
+              }}
+            >
               Short
             </ActionButton>
           </Space>

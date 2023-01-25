@@ -1,13 +1,15 @@
 import {
   CheckCircleOutlined,
   ClockCircleOutlined,
+  DoubleRightOutlined,
+  OrderedListOutlined,
   SettingOutlined,
   StarOutlined,
   TagOutlined,
   TwitterOutlined,
 } from "@ant-design/icons";
 import axios from "axios";
-import { Avatar, Button, Card, List, Space } from "antd";
+import { Avatar, Button, Card, List, Space, Tag } from "antd";
 import React, { useEffect, useState } from "react";
 import useWebSocket from "react-use-websocket";
 import styled from "styled-components";
@@ -15,6 +17,9 @@ import moment from "moment";
 import useSound from "use-sound";
 import gotchaSound from "../sound/gotcha.mp3";
 import SettingModal from "./SettingModal";
+import RulesModal from "./RulesModal";
+import { debounce } from "lodash";
+import { getApiUrl } from "../utils";
 
 const data = [
   {
@@ -546,6 +551,7 @@ function TweetNews() {
   const [tweetList, setTweetList] = useState([]);
   const [playSound] = useSound(gotchaSound);
   const [isOpenModal, setIsOpenModal] = useState(false);
+  const [isOpenRuleModal, setIsOpenRuleModal] = useState(false);
 
   const socketUrl = "ws://127.0.0.1:9000";
 
@@ -565,7 +571,7 @@ function TweetNews() {
         const data = JSON.parse(message.data);
         const newList = [data, ...tweetList];
         setTweetList(newList);
-        playSound();
+        debounce(playSound(), 800);
       }
     },
     onClose: () => console.log("closed the connection"),
@@ -582,17 +588,21 @@ function TweetNews() {
     // });
     axios({
       method: "get",
-      url: "http://localhost:8000/tweets",
+      url: getApiUrl("tweets"),
     }).then((res) => {
       if (res.status == 200) {
         const initialList = res.data.map((item) => JSON.parse(item.data));
-        setTweetList(initialList.reverse());
+        setTweetList(initialList);
       }
     });
   }, []);
 
   const onOpenSetting = () => {
     setIsOpenModal(true);
+  };
+
+  const onOpenRules = () => {
+    setIsOpenRuleModal(true);
   };
 
   return (
@@ -605,19 +615,24 @@ function TweetNews() {
             <span>New Tweet</span>
           </Space>
         }
-        extra={<SettingOutlined onClick={onOpenSetting} />}
+        extra={
+          <Space>
+            <SettingOutlined onClick={onOpenSetting} title="Rules setting" />
+            <OrderedListOutlined onClick={onOpenRules} />
+          </Space>
+        }
         bodyStyle={{ padding: "0px 24px" }}
       >
         <List
           itemLayout="vertical"
           dataSource={tweetList}
           renderItem={(item) => {
-            const { data, includes } = item;
+            const { data, includes, matching_rules } = item;
             const { text, created_at, id } = data || {};
             const { users = [] } = includes || {};
             const { profile_image_url, name, location, username, verified } =
               users[0] || {};
-            const isRetweet = users.length > 1;
+            const isReply = users.length > 1;
 
             const renderTitle = () => {
               return (
@@ -628,6 +643,12 @@ function TweetNews() {
                     target="_blank"
                   >
                     {`${name} (@${username})`}
+
+                    {isReply && (
+                      <DoubleRightOutlined style={{ margin: "0px 10px" }} />
+                    )}
+
+                    {isReply && `${users[1]?.name} (@${users[1]?.username})`}
                   </a>
                 </Space>
               );
@@ -655,6 +676,12 @@ function TweetNews() {
                     {<StarOutlined />}
                     {<span>{location || "Unknown"}</span>}
                   </Space>,
+                  <Space>
+                    <TagOutlined />
+                    {matching_rules.map((item) => (
+                      <Tag key={item.tag}>{item.tag}</Tag>
+                    ))}
+                  </Space>,
                 ]}
               >
                 <ListMeta
@@ -669,6 +696,10 @@ function TweetNews() {
         />
       </Card>
       <SettingModal isOpen={isOpenModal} setIsOpenModal={setIsOpenModal} />
+      <RulesModal
+        isOpen={isOpenRuleModal}
+        setIsOpenModal={setIsOpenRuleModal}
+      />
     </>
   );
 }
